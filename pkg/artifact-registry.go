@@ -32,16 +32,19 @@ type Output struct {
 }
 
 
-func (ar *ArtifactRegistry) Initializer(in map[string] any) (*tfengine.Terraform ,error) {
-	config:=Config{}
-	err:= helpers.YamlConfigParser(in, &config)
+func (ar *ArtifactRegistry) Initializer(plugin shared.Plugin) (*tfengine.Terraform ,error) {
+	config := Config{}
+	err:= helpers.YamlConfigParser(plugin.Config, &config)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to parse YAML config: %v", err)
 	}
-	ar.Config=config
+	ar.Config = config
+	ar.Label = plugin.Label
+	fmt.Println("Parsed config:", ar)
 	// Initialize Terraform
 	files := terraform.LoadTFFiles()
-	t, err := tfengine.NewTF(in, files)
+	tfVars := plugin.Config
+	t, err := tfengine.NewTF(tfVars, files, ar.Label)
 	if err != nil {
 		return nil, fmt.Errorf("Failed to setup Terraform executor: %v", err)
 	}
@@ -51,9 +54,8 @@ func (ar *ArtifactRegistry) Initializer(in map[string] any) (*tfengine.Terraform
 
 
 
-func (ar *ArtifactRegistry) SetupPlugin(config map[string] any) error {
-	
-	tf, err := ar.Initializer(config)
+func (ar *ArtifactRegistry) SetupPlugin(plugin shared.Plugin) error {
+	tf, err := ar.Initializer(plugin)
 	ctx := context.Background()
 	if err != nil {
 		return fmt.Errorf("Failed to initialize plugin: %v", err)
@@ -74,14 +76,13 @@ func (ar *ArtifactRegistry) SetupPlugin(config map[string] any) error {
 	if err := tf.TerraformApply(ctx); err != nil {
 		return fmt.Errorf("Error during Terraform apply: %v", err)
 	}
-	defer cleaner(tf)
 	log.Println("Terraform apply completed.")
 	return nil
 }
 
 
-func (ar *ArtifactRegistry) GetOutput(config map[string] any) shared.GetOutputResponse {
-	tf, err := ar.Initializer(config)
+func (ar *ArtifactRegistry) GetOutput(plugin shared.Plugin) shared.GetOutputResponse {
+	tf, err := ar.Initializer(plugin)
 	if err != nil {
 		return shared.GetOutputResponse{Output: nil, Error: fmt.Errorf("Failed to initialize plugin: %v", err)}
 	}
@@ -96,14 +97,13 @@ func (ar *ArtifactRegistry) GetOutput(config map[string] any) shared.GetOutputRe
 	if err != nil {
 		return shared.GetOutputResponse{Output: nil, Error: fmt.Errorf("Error during Terraform output: %v", err)}
 	}
-	defer cleaner(tf)
 	log.Println("Terraform output retrieved successfully.")
 	return shared.GetOutputResponse{Output: output, Error: nil}
 }
 
 
-func (ar *ArtifactRegistry) Destroy(config map[string] any) error {
-	tf, err := ar.Initializer(config)
+func (ar *ArtifactRegistry) Destroy(plugin shared.Plugin) error {
+	tf, err := ar.Initializer(plugin)
 	if err != nil {
 		return fmt.Errorf("Failed to initialize plugin: %v", err)
 	}
@@ -116,14 +116,6 @@ func (ar *ArtifactRegistry) Destroy(config map[string] any) error {
 	if err := tf.TerraformDestroy(ctx); err != nil {
 		return fmt.Errorf("Error during Terraform destroy: %v", err)
 	}
-	defer cleaner(tf)
 	log.Println("Terraform destroy completed.")
 	return nil
-}
-
-func cleaner(t *tfengine.Terraform) {
-	// Clean up the temporary directory
-	if err := t.CleanUp(); err != nil {
-		log.Printf("Error cleaning up temporary directory: %v", err)
-	}
 }
