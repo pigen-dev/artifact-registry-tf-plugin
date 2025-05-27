@@ -64,7 +64,7 @@ require (
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/oklog/run v1.1.0 // indirect
-	github.com/pigen-dev/shared v1.4.1
+	github.com/pigen-dev/shared v1.4.2
 	github.com/zclconf/go-cty v1.16.2 // indirect
 	golang.org/x/net v0.40.0 // indirect
 	golang.org/x/sys v0.33.0 // indirect
